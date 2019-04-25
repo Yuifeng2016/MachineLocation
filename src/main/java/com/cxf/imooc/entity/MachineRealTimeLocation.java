@@ -1,6 +1,7 @@
 package com.cxf.imooc.entity;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 
@@ -10,6 +11,7 @@ import java.io.Serializable;
  * @description：桩机实时位置类
  */
 @Data
+@EqualsAndHashCode
 public class MachineRealTimeLocation implements Serializable {
     private static final long serialVersionUID = 8195570989072284198L;
     private String id;

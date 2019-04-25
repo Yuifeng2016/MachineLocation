@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.cxf</groupId>
-    <artifactId>imooc</artifactId>
+    <artifactId>machine-location-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>imooc</name>
+    <name>machine-location-server</name>
     <description>Demo project for Spring Boot netty</description>
 
     <properties>

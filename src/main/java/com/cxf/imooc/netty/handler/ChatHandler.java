@@ -24,10 +24,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author ：yuifeng
@@ -40,7 +37,7 @@ import java.util.Set;
 public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
     private static Logger logger = LoggerFactory.getLogger(ChatHandler.class);
 
-    private static final int EXPIRE_TIME = 1 ;
+    private static final int EXPIRE_TIME = 5 ;
 
     private RedisTemplate<String, Serializable> redisCacheTemplate;
 
@@ -64,42 +61,11 @@ public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame>
         // 1.获取上传的消息
         String text = msg.text();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String dateTime = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
-        if (text.isEmpty()){
-            ctx.channel().writeAndFlush(new TextWebSocketFrame("["+dateTime +"]:"+"内容不能为空"));
-            return;
-        }
-        logger.info("客户端传过来的消息:{}",text);
-
-        // 2.尝试转换为MachineRealTimeLocation对象
-        ObjectMapper mapper  = new ObjectMapper();
-        MachineRealTimeLocation location = null;
-        try {
-            location = mapper.readValue(text, MachineRealTimeLocation.class);
-            boolean fieldIsNull = CommonUtil.checkObjFieldIsNull(location,"taskId","type");
-            if(fieldIsNull){
-                ctx.channel().writeAndFlush(new TextWebSocketFrame("["+dateTime +"]:"+"json参数不完整"));
-                return;
-            }
-        } catch (IOException e) {
-            ctx.channel().writeAndFlush(new TextWebSocketFrame("["+dateTime +"]:"+"json转换异常"));
-            return;
-        }
-
-        // 3.获取过期时间
-        Long nowSecond = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
-        Long oldSecond = nowSecond - EXPIRE_TIME * 60; //分钟
-
-        String key = "south:machine:Location";
-        redisCacheTemplate.opsForZSet().add(key,location,nowSecond);
-
-        Set<Serializable> activeLocations = redisCacheTemplate.opsForZSet().rangeByScore(key, oldSecond, nowSecond);
-        List<Serializable> list =  new ArrayList<>(activeLocations);
-        String msgToClient = "activeMachine：" +mapper.writeValueAsString(list);
-        //logger.info("5分钟内更新的位置数：{}",activeLocations.size());
+        String dateTimeStr = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
+        logger.info("[{}]客户端传过来的消息:{}",dateTimeStr,text);
 
         //把消息刷到所有客户端
-        clients.writeAndFlush(new TextWebSocketFrame("["+dateTime +"]:"+msgToClient));
+        clients.writeAndFlush(new TextWebSocketFrame("["+dateTimeStr +"]:"+text));
     }
 
     /**

@@ -59,7 +59,7 @@ public class CommonUtil {
         List<String> list = Arrays.asList(exclusions);
         for (Field f : obj.getClass().getDeclaredFields()) {
             f.setAccessible(true);
-            logger.info(f.getName());
+            //logger.info(f.getName());
             Object fileObj = f.get(obj);
             if (list.contains(f.getName())){
                 continue;

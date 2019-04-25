@@ -1,6 +1,7 @@
 package com.cxf.imooc.netty.initializer;
 
 import com.cxf.imooc.netty.handler.ChatHandler;
+import com.cxf.imooc.netty.handler.OnlineMachineHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.group.ChannelGroup;
@@ -59,11 +60,14 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
          * 对于websocket来讲，都是以frames进行传输的，不同的数据类型对应的frames也不同
          */
         pipeline.addLast(new WebSocketServerProtocolHandler("/ws"));
-
         //自定义处理器
-        ChatHandler chatHandler = new ChatHandler();
-        chatHandler.setRedisCacheTemplate(redisCacheTemplate);
-        pipeline.addLast(chatHandler);
+        pipeline.addLast(new ChatHandler());
+        pipeline.addLast(new WebSocketServerProtocolHandler("/ws_location"));
+        pipeline.addLast(new OnlineMachineHandler(redisCacheTemplate));
+
+
+
+
 
     }
 }
