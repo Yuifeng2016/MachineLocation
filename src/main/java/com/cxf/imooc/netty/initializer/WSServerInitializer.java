@@ -9,6 +9,11 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Component;
+
+import java.io.Serializable;
 
 /**
  * @author ：yuifeng
@@ -16,10 +21,15 @@ import io.netty.handler.stream.ChunkedWriteHandler;
  * @description：WSServer初始化类
  * @version:
  */
+@Component
 public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
     private final int MAX_CONTENT_LENGTH = 1024*64;
 
     private static ChannelGroup group;
+
+    @Autowired
+    private RedisTemplate<String, Serializable> redisCacheTemplate;
+
     public WSServerInitializer (){
 
     }
@@ -50,7 +60,10 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
          */
         pipeline.addLast(new WebSocketServerProtocolHandler("/ws"));
 
-        //自定义助手类
-        pipeline.addLast(new ChatHandler());
+        //自定义处理器
+        ChatHandler chatHandler = new ChatHandler();
+        chatHandler.setRedisCacheTemplate(redisCacheTemplate);
+        pipeline.addLast(chatHandler);
+
     }
 }

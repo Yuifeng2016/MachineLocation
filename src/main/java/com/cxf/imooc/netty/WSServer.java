@@ -9,6 +9,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,19 +22,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class WSServer {
 
+    @Value("${webSocket.port}")
+    private Integer port;
+
     private static Logger logger = LoggerFactory.getLogger(WSServer.class);
     private EventLoopGroup bossGruop ; //主线程组，用于接收客户端的连接，将操作交给从线程组，不做具体处理
     private EventLoopGroup workerGruop ; //从线程组，用于处理住线程组交过来的操作
     private  ChannelFuture channelFuture;
     private ServerBootstrap serverBootstrap;  //netty服务器 创建，使用ServerBootstrap启动类
 
-    private static class SingletionWSServer {
-        static final WSServer INSTANCE = new WSServer();
-    }
-
-    public static WSServer getInstance(){
-        return SingletionWSServer.INSTANCE;
-    }
+    @Autowired
+    private WSServerInitializer wsServerInitializer;
+//    private static class SingletionWSServer {
+//        static final WSServer INSTANCE = new WSServer();
+//    }
+//
+//    public static WSServer getInstance(){
+//        return SingletionWSServer.INSTANCE;
+//    }
 
     public WSServer(){
         //定义一对线程组
@@ -41,11 +47,14 @@ public class WSServer {
         workerGruop = new NioEventLoopGroup();
 
         serverBootstrap = new ServerBootstrap();
-        serverBootstrap.group(bossGruop,workerGruop)
-                .channel(NioServerSocketChannel.class)  //设置通道类型
-                .childHandler(new WSServerInitializer());//设置助手类
+
     }
 
+    public void init(){
+        serverBootstrap.group(bossGruop,workerGruop)
+                .channel(NioServerSocketChannel.class)  //设置通道类型
+                .childHandler(wsServerInitializer);//设置初始化器
+    }
 
 
     public void start(Integer port){
@@ -54,6 +63,11 @@ public class WSServer {
         if (channelFuture!=null){
             logger.info("netty启动完成,port: {}",port);
         }
+
+    }
+
+    public void start(){
+        start(this.port);
 
     }
 

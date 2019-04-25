@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cxf.imooc.dao.PilingDetailDao">
+
+    <!-- 文件信息表 -->
+    <sql id="BaseTable"> piling_detail_copy1 </sql>
+
+    <!-- 文件表的字段与类映射关系 -->
+    <resultMap id="BaseMap" type="com.cxf.imooc.entity.PilingTsDetailEntity">
+        <id column="id" property="id"/>
+        <result column="pile_name" property="pileName"/>
+        <result column="task_name" property="taskName"/>
+        <result column="area_name" property="areaName"/>
+        <result column="pile_name" property="pileName"/>
+        <result column="project_id" property="projectId"/>
+        <result column="b" property="b"/>
+        <result column="l" property="l"/>
+        <result column="x" property="x"/>
+        <result column="y" property="y"/>
+        <result column="z" property="z"/>
+        <result column="real_x" property="realx"/>
+        <result column="real_y" property="realy"/>
+        <result column="real_z" property="realz"/>
+        <result column="radius" property="radius"/>
+        <result column="length" property="length"/>
+        <result column="piling_error" property="pilingError"/>
+        <result column="status" property="status"/>
+        <result column="create_id" property="createId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="finish_time" property="finishTime"/>
+        <result column="machine_id" property="machineId"/>
+        <result column="org_id" property="orgId"/>
+        <result column="location" property="location"/>
+        <result column="upload_finish_time" property="uploadFinishTime"/>
+        <result column="start_offset" property="startOffset"/>
+        <result column="end_offset" property="endOffset"/>
+        <result column="pressure" property="pressure"/>
+        <result column="pile_machine" property="pileMachine"/>
+
+        <result column="orgName" property="orgName"/>
+        <result column="program_id" property="programId"/>
+    </resultMap>
+
+    <!-- 结果映射 -->
+    <resultMap id="backMap" type="HashMap">
+        <result property="key" column="param"/>
+        <result property="value" column="count"/>
+    </resultMap>
+
+    <resultMap id="carMap" type="HashMap">
+        <result property="name" column="param"/>
+        <result property="value" column="count"/>
+    </resultMap>
+
+    <!-- 表所有字段 -->
+    <sql id="allColumns">
+        pilingDetail.ID, pilingDetail.pile_name, pilingDetail.task_name,
+        pilingDetail.area_name, pilingDetail.project_id, pilingDetail.b,
+        pilingDetail.l, pilingDetail.x, pilingDetail.y, pilingDetail.z,pilingDetail.real_x,
+        pilingDetail.real_y, pilingDetail.real_z, pilingDetail.radius,pilingDetail.length,
+        pilingDetail.piling_error, pilingDetail.status, pilingDetail.create_id,
+        pilingDetail.create_time, pilingDetail.finish_time, pilingDetail.machine_id,
+        pilingDetail.location, pilingDetail.upload_finish_time,pilingDetail.org_id,
+        pilingDetail.start_offset, pilingDetail.end_offset,pilingDetail.pile_machine,
+        pilingDetail.pressure,pilingDetail.program_id
+    </sql>
+
+    <select id="getById" parameterType="String" resultMap="BaseMap">
+        select <include refid="allColumns"/> from piling_detail_copy1 pilingDetail  where pilingDetail.ID = #{id}
+    </select>
+
+
+
+
+    <update id="updateDetailProgramIdWithProjectId" parameterType="list">
+        <foreach collection="list" index="index" item="item">
+            UPDATE piling_detail_copy1 SET
+            program_id = '${item.programId}'
+            WHERE project_id = '${item.taskId}';
+        </foreach>
+    </update>
+
+
+    
+
+</mapper>

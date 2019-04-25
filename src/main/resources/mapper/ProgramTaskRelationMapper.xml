@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cxf.imooc.dao.ProgramTaskRelationDao">
+
+
+    <!-- 文件表的字段与类映射关系 -->
+    <resultMap id="BaseMap" type="com.cxf.imooc.entity.ProgramTaskRelation">
+        <result column="id" property="taskId" jdbcType="VARCHAR" />
+        <result column="pid" property="programId" jdbcType="VARCHAR" />
+    </resultMap>
+
+    <!-- 表所有字段 -->
+    <sql id="allColumns">
+        id,pid
+    </sql>
+
+    <select id="getAll"  resultMap="BaseMap">
+        select <include refid="allColumns"/> from  piling_project
+    </select>
+
+    <select id="getByTaskId" parameterType="String" resultMap="BaseMap">
+        select <include refid="allColumns"/> from  piling_project where  id = #{id}
+    </select>
+
+
+
+    
+
+</mapper>
