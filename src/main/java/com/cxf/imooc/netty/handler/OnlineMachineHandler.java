@@ -1,24 +1,25 @@
 package com.cxf.imooc.netty.handler;
 
 import com.cxf.imooc.entity.MachineRealTimeLocation;
+import com.cxf.imooc.service.LocationRedisService;
 import com.cxf.imooc.util.CommonUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.*;
+
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author ：yuifeng
@@ -26,29 +27,72 @@ import java.util.*;
  * @description：在线桩机处理器
  * @version:
  */
-public class OnlineMachineHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
+public class OnlineMachineHandler extends  SimpleChannelInboundHandler<TextWebSocketFrame> {
     private static Logger logger = LoggerFactory.getLogger(OnlineMachineHandler.class);
+    private static String MACHINE_KEY = "south:machine:Location:";
+    private static String MACHINE_KEYS_NAME = "south:machine:Location:keys";
+    private static final int EXPIRE_MINUTES = 2 ;
 
-    private static final int EXPIRE_TIME = 5 ;
+//    private static String MACHINE_KEY = "machineLoc:";
+//    private static String MACHINE_KEYS_NAME = "machineLoc:keys";
 
-    private RedisTemplate<String, Serializable> redisCacheTemplate;
+    //用于记录和管理所有客户端的channel
+    private   ChannelGroup clients ;
 
 
-    public OnlineMachineHandler(RedisTemplate<String, Serializable> redisCacheTemplate){
+
+    private RedisTemplate<String, String> redisCacheTemplate;
+
+    private LocationRedisService locationRedisService;
+
+
+    public OnlineMachineHandler(RedisTemplate<String, String> redisCacheTemplate ,LocationRedisService locationRedisService,ChannelGroup group){
         this.redisCacheTemplate = redisCacheTemplate;
+        this.locationRedisService = locationRedisService;
+        this.clients = group;
     }
 
 
-    //用于记录和管理所有客户端的channel
-    private static ChannelGroup clients = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    public OnlineMachineHandler(LocationRedisService locationRedisService,ChannelGroup group){
+
+        this.locationRedisService = locationRedisService;
+        this.clients = group;
+    }
+
+    private ObjectMapper mapper  = new ObjectMapper();
+
+
+
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        //是否握手成功，升级为 Websocket 协议
+        if (evt == WebSocketServerProtocolHandler.ServerHandshakeStateEvent.HANDSHAKE_COMPLETE) {
+            // 握手成功，移除 HttpRequestHandler，因此将不会接收到任何消息
+            // 并把握手成功的 Channel 加入到 ChannelGroup 中
+//            Long nowSecond = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));    //秒
+//            Long beforeSecond = nowSecond - EXPIRE_MINUTES * 60 ;
+//            Map<String, Object> locations = getMachineRealTimeLocations(nowSecond, beforeSecond);
+
+            String msgToClient = mapper.writeValueAsString(locationRedisService.getMachineRealTimeLocations());
+            ctx.channel().writeAndFlush((new TextWebSocketFrame("["+getDateTimeString() +"]: "+msgToClient)));
+            clients.add(ctx.channel());
+        }
+
+
+    }
+
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame msg) throws Exception {
 
+        if (!(msg instanceof TextWebSocketFrame)) {
+            throw new UnsupportedOperationException(String.format("%s frame types not supported", msg.getClass().getName()));
+        }
+
         // 1.获取上传的消息
-        String text = msg.text();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String dateTimeStr = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
+        String text = ((TextWebSocketFrame)msg).text().replaceAll("\\s*", "");
+        String dateTimeStr = getDateTimeString();
         logger.info("[{}]客户端传过来的消息:{}",dateTimeStr,text);
         if (text.isEmpty()){
             ctx.channel().writeAndFlush(new TextWebSocketFrame("["+dateTimeStr +"]:"+"内容不能为空"));
@@ -57,8 +101,8 @@ public class OnlineMachineHandler extends SimpleChannelInboundHandler<TextWebSoc
 
 
         // 2.尝试转换为MachineRealTimeLocation对象
-        ObjectMapper mapper  = new ObjectMapper();
-        MachineRealTimeLocation location = null;
+
+        MachineRealTimeLocation location;
         try {
             location = mapper.readValue(text, MachineRealTimeLocation.class);
             //判断必要字段是否为空
@@ -72,26 +116,27 @@ public class OnlineMachineHandler extends SimpleChannelInboundHandler<TextWebSoc
             return;
         }
 
-        // 3.获取过期时间
-        Long nowSecond = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
-        Long oldSecond = nowSecond - EXPIRE_TIME * 60; //分钟
+        // 3.1获取过期时间
+        Long nowSecond = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));    //秒
+        //Long beforeSecond = nowSecond - EXPIRE_MINUTES * 60 ;
 
-        // 4.添加到redis，操作前先判断是否是相同的对象
-        String key = "south:machine:Location";
-        Set<Serializable> activeLocations = redisCacheTemplate.opsForZSet().rangeByScore(key, oldSecond, nowSecond);
+        // 3.2保存到redis
+        //saveToRedis(text, location.getId(), nowSecond);
+        locationRedisService.saveToRedis(text, location.getId());
+        // 4.获取最新的有效数据
+//        Map<String,Object> returnMap = getMachineRealTimeLocations( nowSecond, beforeSecond);
+//        String msgToClient = mapper.writeValueAsString(returnMap);
+        String msgToClient = locationRedisService.getMachineRealTimeLocationsJson();
 
-
-        redisCacheTemplate.opsForZSet().add(key,location,nowSecond);
-
-
-        List<Serializable> list =  new ArrayList<>(activeLocations);
-        Map<String,Object> returnMap = new HashMap<>();
-        returnMap.put("activeMachine",list);
-        String msgToClient = mapper.writeValueAsString(returnMap);
-
-        //把消息刷到所有客户端
-        clients.writeAndFlush(new TextWebSocketFrame("["+dateTimeStr +"]:"+msgToClient));
+        // 5.把消息刷到所有客户端
+        clients.writeAndFlush(new TextWebSocketFrame("["+getDateTimeString() +"]:"+msgToClient));
     }
+
+    private String getDateTimeString() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        return LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
+    }
+
 
     /**
      * 当客户端连接服务端后，获取客户端的channel，并放到channelGroup中进行管理
@@ -101,7 +146,16 @@ public class OnlineMachineHandler extends SimpleChannelInboundHandler<TextWebSoc
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         logger.info("channel added：{}",ctx.channel().id().asShortText());
-        clients.add(ctx.channel());
+
+        //clients.add(ctx.channel());
+
+    }
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        logger.info("channel in active：{}",ctx.channel().id().asShortText());
+        ctx.channel().eventLoop().schedule(() -> {
+            logger.info("sout....");
+        },6, TimeUnit.SECONDS);
     }
 
     @Override
@@ -109,7 +163,60 @@ public class OnlineMachineHandler extends SimpleChannelInboundHandler<TextWebSoc
         //当触发handlerRemoved，channel会自动移除对应客户端的channel
 //        clients.remove(ctx.channel());
         //logger.info("channel long id：{}",ctx.channel().id().asLongText());
-        logger.info("channel removed ,short id：{}",ctx.channel().id().asShortText());
+        logger.info("channel removed, short id：{}",ctx.channel().id().asShortText());
+    }
+
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cause.printStackTrace();
+        ctx.close();
+    }
+
+    /**
+     * 根据时间区间获取位置信息并封装到一个map中
+     * @param nowSecond
+     * @param beforeSecond
+     * @return
+     * @throws IOException
+     */
+    private Map<String,Object> getMachineRealTimeLocations( Long nowSecond, Long beforeSecond) throws IOException {
+        // 4.读取最新的数据返回给客户端
+        Set<String> keys = redisCacheTemplate.opsForZSet().rangeByScore(MACHINE_KEYS_NAME, beforeSecond, nowSecond);
+        List<MachineRealTimeLocation> locationsList = new ArrayList<>();
+        for (String key:keys) {
+            String locationJson = redisCacheTemplate.opsForValue().get(key);
+            MachineRealTimeLocation location1 = mapper.readValue(locationJson, MachineRealTimeLocation.class);
+            locationsList.add(location1);
+        }
+
+        Map<String,Object> returnMap = new HashMap<>();
+        if (locationsList.size() == 0){
+            return returnMap;
+        }
+        returnMap.put("activeMachine",locationsList);
+
+        return returnMap;
+    }
+
+    /**
+     *
+     * @param text
+     * @param id
+     * @param nowSecond
+     */
+    private void saveToRedis(String text, String id, Long nowSecond) {
+        // 3.2通过json格式校验，开始执行保存,保存前判断是存在记录，若存在则删除
+        String locationKey = MACHINE_KEY + id;
+//        String tempLocationJson = redisCacheTemplate.opsForValue().get(locationKey);
+//        if (tempLocationJson != null && tempLocationJson != ""){
+//            redisCacheTemplate.delete(locationKey);
+//        }
+        // 3.3保存location 与 对应的key
+
+        redisCacheTemplate.opsForValue().set(locationKey,text, EXPIRE_MINUTES,TimeUnit.MINUTES);    //保存记录
+
+        redisCacheTemplate.opsForZSet().add(MACHINE_KEYS_NAME,locationKey,nowSecond);               //保存键
     }
 
 }

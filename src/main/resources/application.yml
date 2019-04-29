@@ -1,7 +1,8 @@
 
 
 webSocket:
-  port: 8071
+  port: 8070
+  expire-minutes: 5
 
 
 spring:
@@ -22,11 +23,7 @@ spring:
         # 连接池中的最小空闲连接 默认 0
         min-idle: 0
 
-  datasource:
-    url: *
-    username: *
-    password: *
-    driver-class-name: org.postgresql.Driver
+
 
 
 #mybatis配置
@@ -38,5 +35,6 @@ mybatis:
 logging:
     level:
       com.cxf.imooc.dao: DEBUG
+
 
 

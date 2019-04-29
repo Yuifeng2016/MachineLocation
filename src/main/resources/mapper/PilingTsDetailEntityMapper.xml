@@ -36,7 +36,6 @@
         <result column="end_offset" property="endOffset"/>
         <result column="pressure" property="pressure"/>
         <result column="pile_machine" property="pileMachine"/>
-
         <result column="orgName" property="orgName"/>
         <result column="program_id" property="programId"/>
     </resultMap>
