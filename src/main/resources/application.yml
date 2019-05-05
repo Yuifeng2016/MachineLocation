@@ -26,15 +26,4 @@ spring:
 
 
 
-#mybatis配置
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.cxf.imooc.entity
-
-#打印sql语句
-logging:
-    level:
-      com.cxf.imooc.dao: DEBUG
-
-
 

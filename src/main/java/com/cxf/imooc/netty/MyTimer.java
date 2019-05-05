@@ -38,7 +38,6 @@ public class MyTimer {
 
 
 
-
     public static void addTask(TimerTask task){
         //根据时长把task任务放到响应的solt上
         timer.newTimeout(task,2,TimeUnit.SECONDS);

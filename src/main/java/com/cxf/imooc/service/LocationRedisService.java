@@ -1,6 +1,7 @@
 package com.cxf.imooc.service;
 
 import com.cxf.imooc.entity.MachineRealTimeLocation;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * @author ：XueFF
@@ -57,17 +59,11 @@ public class LocationRedisService {
     }
 
 
-    /**
-     * 根据时间区间获取位置信息并封装到一个map中
-
-     * @return
-     * @throws IOException
-     */
-    public Map<String,Object> getMachineRealTimeLocations() throws IOException {
+    public  List<MachineRealTimeLocation> getMachineRealTimeLocationList()  {
         // 3.1获取过期时间
         LocalDateTime localDateTime =LocalDateTime.now();
         Long nowSecond = localDateTime.toEpochSecond(ZoneOffset.of("+8"));    //秒
-        logger.info("过期时间{}分钟",expireMinutes);
+        //logger.info("过期时间{}分钟",expireMinutes);
         Long beforeSecond = nowSecond - expireMinutes * 60 ;
         // 4.读取最新的数据返回给客户端
         Set<String> keys = redisCacheTemplate.opsForZSet().rangeByScore(MACHINE_KEYS_NAME, beforeSecond, nowSecond);
@@ -78,24 +74,68 @@ public class LocationRedisService {
                 logger.info("locationJson is null");
                 continue;
             }
-            MachineRealTimeLocation location1 = mapper.readValue(locationJson, MachineRealTimeLocation.class);
-            locationsList.add(location1);
+            MachineRealTimeLocation location1 = null;
+            try {
+                location1 = mapper.readValue(locationJson, MachineRealTimeLocation.class);
+                locationsList.add(location1);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
+
+        return locationsList;
+    }
+
+    public  List<MachineRealTimeLocation> getMachineRealTimeLocationListByUserId(String username)  {
+        List<MachineRealTimeLocation> list = getMachineRealTimeLocationList().stream().filter(location->{
+            return location.getUsername().equalsIgnoreCase(username);
+        }).collect(Collectors.toList());
+
+
+        return list;
+    }
+
+
+
+    /**
+     * 根据时间区间获取位置信息并封装到一个map中
+
+     * @return
+     */
+    public Map<String,Object> getMachineRealTimeLocations(String username)  {
+        List<MachineRealTimeLocation> locationList= null;
+        if (username!= null){
+            locationList = getMachineRealTimeLocationListByUserId(username);
+        }else {
+             locationList = getMachineRealTimeLocationList();
         }
 
         Map<String,Object> returnMap = new HashMap<>();
-        if (locationsList.size() == 0){
+        if (locationList.size() == 0){
             return returnMap;
         }
 //        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 //        returnMap.put("serverTime",localDateTime.format(formatter));
-        returnMap.put("activeMachine",locationsList);
+        returnMap.put("activeMachine",locationList);
         logger.info(returnMap.toString());
         return returnMap;
     }
 
-    public String  getMachineRealTimeLocationsJson() throws IOException {
 
-        String msgToClient = mapper.writeValueAsString(getMachineRealTimeLocations());
+    public Map<String,Object> getMachineRealTimeLocations()  {
+
+        return getMachineRealTimeLocations(null);
+    }
+
+    public String  getMachineRealTimeLocationsJson(String username){
+
+        String msgToClient = null;
+        try {
+            msgToClient = mapper.writeValueAsString(getMachineRealTimeLocations(username));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
         return msgToClient;
     }
 

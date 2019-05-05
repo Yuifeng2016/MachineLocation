@@ -44,7 +44,7 @@ public class WSServer {
     private static ChannelGroup channelGroup ;
     private ServerBootstrap serverBootstrap;  //netty服务器 创建，使用ServerBootstrap启动类
 
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    //DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
     private WSServerInitializer wsServerInitializer;
@@ -67,24 +67,7 @@ public class WSServer {
                 .channel(NioServerSocketChannel.class)  //设置通道类型
                 .childHandler(wsServerInitializer);//设置初始化器
 
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run(Timeout timeout) throws Exception {
-                if (channelGroup.size() != 0){
-                    String dateTime = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
 
-                    logger.info("[{}]---run service timer----",dateTime);
-
-                    String locations = locationRedisService.getMachineRealTimeLocationsJson();
-                    String msgToClient = String.format("[%s]: %s",dateTime,locations);
-                    channelGroup.writeAndFlush(new TextWebSocketFrame(msgToClient));
-                }
-
-                //任务执行完成后再把自己添加到任务solt上
-                MyTimer.addTask(this);
-            }
-        };
-        MyTimer.addTask(task);
     }
 
 
