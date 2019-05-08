@@ -78,8 +78,8 @@ public class OnlineMachineHandler extends  SimpleChannelInboundHandler<TextWebSo
 //            Long beforeSecond = nowSecond - EXPIRE_MINUTES * 60 ;
 //            Map<String, Object> locations = getMachineRealTimeLocations(nowSecond, beforeSecond);
 
-            String msgToClient = mapper.writeValueAsString(locationRedisService.getMachineRealTimeLocations());
-            ctx.channel().writeAndFlush((new TextWebSocketFrame("["+getDateTimeString() +"]: "+msgToClient)));
+            //String msgToClient = mapper.writeValueAsString(locationRedisService.getMachineRealTimeLocations());
+            //ctx.channel().writeAndFlush((new TextWebSocketFrame("["+getDateTimeString() +"]: "+msgToClient)));
             clients.add(ctx.channel());
         }
 

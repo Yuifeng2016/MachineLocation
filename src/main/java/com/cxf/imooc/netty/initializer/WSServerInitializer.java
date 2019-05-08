@@ -8,6 +8,7 @@ import com.cxf.imooc.netty.handler.OnlineMachineHandler;
 import com.cxf.imooc.netty.handler.TextWebSocketHandler;
 import com.cxf.imooc.service.LocationRedisService;
 import com.cxf.imooc.util.BeansUtils;
+import com.cxf.imooc.util.Constants;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -82,8 +83,8 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast(new HttpObjectAggregator(MAX_CONTENT_LENGTH));
         //===============以上用于支持http协议==============
 
-        pipeline.addLast(new TextWebSocketHandler());
-        //自定义处理器1
+
+        //自定义处理器
 
         /**
          * websocket 服务器处理的协议，用于制定给客户端访问的路由地址
@@ -91,7 +92,11 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
          * 比如握手的动作(close,ping,pong)
          * 对于websocket来讲，都是以frames进行传输的，不同的数据类型对应的frames也不同
          */
-        pipeline.addLast(new WebSocketServerProtocolHandler("/ws"));
+        pipeline.addLast(new TextWebSocketHandler());
+        pipeline.addLast(new WebSocketServerProtocolHandler(Constants.DEFAULT_WEB_SOCKET_LINK));
+
+
+
         //pipeline.addLast(new OnlineMachineHandler(locationRedisService,group));
 
 
@@ -108,13 +113,17 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
             public void run(Timeout timeout) throws Exception {
                 if (onlineContainer.getOnlineUserMap().size() != 0){
                     String dateTime = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
+                    onlineContainer.getUserMap().forEach((userId,ctxId)->{
+                        //根据userId获取projectId
+                        Map<String, String> userParams = onlineContainer.getUserParamsMap().get(userId);
 
-
-                    onlineContainer.getUserMap().forEach((username,ctxId)->{
-                        String locations = locationRedisService.getMachineRealTimeLocationsJson(username);
+                        //根据projectId获取位置记录
+                        String locations = locationRedisService.getMachineRealTimeLocationsJson(userParams);
                         String msgToClient = String.format("[%s]: %s",dateTime,locations);
-                        //logger.info("username:{},locations:{}",username,locations);
-                        ChannelHandlerContext context = onlineContainer.getChannelHandlerContextByUserId(username);
+                        logger.info("username:{},locations:{}",userId,locations);
+                        //此处projectId视为接入服务的用户的id
+                        ChannelHandlerContext context = onlineContainer.getChannelHandlerContextByUserId(userId);
+
                         context.channel().writeAndFlush(new TextWebSocketFrame(msgToClient));
                     });
                 }

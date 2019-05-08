@@ -1,10 +1,12 @@
 package com.cxf.imooc.netty;
 
 import io.netty.channel.ChannelHandlerContext;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @description：存储在线ws用户的容器
  */
 @Component
+@Data
 public class OnlineContainer {
 
     private Logger log = LoggerFactory.getLogger(this.getClass()); // 日志对象
@@ -27,26 +30,7 @@ public class OnlineContainer {
      **/
     private Map<String, String> userMap = new ConcurrentHashMap<>();
 
-
-
-
-    public Map<String, String> getUserMap() {
-        return userMap;
-    }
-
-    public void setUserMap(Map<String, String> userMap) {
-        this.userMap = userMap;
-    }
-
-    public Map<String, ChannelHandlerContext> getOnlineUserMap() {
-        return onlineUserMap;
-    }
-
-    public void setOnlineUserMap(Map<String, ChannelHandlerContext> onlineUserMap) {
-        this.onlineUserMap = onlineUserMap;
-    }
-
-
+    private Map<String, Map<String,String>> userParamsMap = new ConcurrentHashMap<>();
 
 
     /***
@@ -59,9 +43,12 @@ public class OnlineContainer {
     /***
      * 添加session信息
      * */
-    public void putAll(String userId, ChannelHandlerContext ctx) {
+    public void putAll(String userId, ChannelHandlerContext ctx,Map<String,String > userParams) {
         userMap.put(userId, ctx.channel().id().asLongText());
         onlineUserMap.put(ctx.channel().id().asLongText(), ctx);
+//        Map<String,String > userParamsReal = new HashMap<>(userParams);
+//        userParamsReal.remove("userId");
+        userParamsMap.put(userId,userParams);
         log.info("用户 [ {} ] 上线", userId);
     }
 

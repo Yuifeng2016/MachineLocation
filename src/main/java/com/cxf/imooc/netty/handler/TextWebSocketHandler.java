@@ -5,17 +5,24 @@ import com.cxf.imooc.util.Constants;
 import com.cxf.imooc.netty.OnlineContainer;
 import com.cxf.imooc.util.BeansUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.websocketx.*;
+import io.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -27,8 +34,9 @@ public class TextWebSocketHandler extends SimpleChannelInboundHandler<TextWebSoc
     private Logger log = LoggerFactory.getLogger(this.getClass()); // 日志对象
 
     private OnlineContainer onlineContainer;
+    private WebSocketServerHandshaker handshaker;
 
-
+    private ChannelHandlerContext ctx;
     //private BeansUtils beansUtils;
 
     public TextWebSocketHandler() {
@@ -45,31 +53,100 @@ public class TextWebSocketHandler extends SimpleChannelInboundHandler<TextWebSoc
         if (null != msg && msg instanceof FullHttpRequest) {
 
             FullHttpRequest request = (FullHttpRequest) msg;
-             log.info("调用 channelRead request.uri() [ {} ]", request.uri());
-            String uri = request.uri();
+            handleHttpRequest(ctx,request);
+
+            log.info("调用 channelRead request.uri() [ {} ]", request.uri());
+            String uriStr = request.uri();
+            URI uri = new URI(uriStr);
+            
+
+
              log.info("Origin [ {} ] [ {} ]", request.headers().get("Origin"), request.headers().get("Host"));
             String origin = request.headers().get("Origin");
-            if (null == origin) {
-                log.info("origin 为空 ");
-                ctx.close();
-            } else {
-                if (null != uri && uri.contains(Constants.DEFAULT_WEB_SOCKET_LINK) && uri.contains("?")) {
-                    String[] uriArray = uri.split("\\?");
-                    if (null != uriArray && uriArray.length > 1) {
-                        String[] paramsArray = uriArray[1].split("=");
-                        if (null != paramsArray && paramsArray.length > 1) {
-                            onlineContainer.putAll(paramsArray[1], ctx);
+            if (null != origin) {
+                if (null != uriStr && uriStr.contains(Constants.DEFAULT_WEB_SOCKET_LINK) && uriStr.contains("?")) {
+                    String query = uri.getRawQuery();
+                    String[] uriArray = uriStr.split("\\?");
+
+                    Map<String,String> paramsMap = new HashMap<>();
+
+                    if (null != query && query != ""){
+                        String[] params = query.split("&");
+                        for (String param: params) {
+                            String[] paramPair = param.split("=");
+                            paramsMap.put(paramPair[0],paramPair[1]);
+                        }
+                        log.info("参数键值对：{}",paramsMap);
+                        if (paramsMap.size()!= 0){
+
+                            onlineContainer.putAll(paramsMap.get("userId"), ctx,paramsMap);
                         }
                     }
+
                     request.setUri(Constants.DEFAULT_WEB_SOCKET_LINK);
                 }else {
                     log.info("不允许 [ {} ] 连接 强制断开", origin);
                     ctx.close();
                 }
-            }
+            } /*else {
+                log.info("origin 为空 ");
+                ctx.close();
+            }*/
 
         }
-        super.channelRead(ctx, msg);
+
+        //super.channelRead(ctx, msg);
+    }
+
+
+
+
+    /**
+     * 处理Http请求，完成WebSocket握手<br/>
+     * 注意：WebSocket连接第一次请求使用的是Http
+     * @param ctx
+     * @param request
+     * @throws Exception
+     */
+    private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
+        // 如果HTTP解码失败，返回HHTP异常
+        if (!request.getDecoderResult().isSuccess() || (!"websocket".equals(request.headers().get("Upgrade")))) {
+            sendHttpResponse(ctx, request, new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST));
+            return;
+        }
+
+        // 正常WebSocket的Http连接请求，构造握手响应返回
+        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory("ws://" + request.headers().get(HttpHeaders.Names.HOST), null, false);
+        handshaker = wsFactory.newHandshaker(request);
+        if (handshaker == null) { // 无法处理的websocket版本
+            WebSocketServerHandshakerFactory.sendUnsupportedWebSocketVersionResponse(ctx.channel());
+        } else { // 向客户端发送websocket握手,完成握手
+            handshaker.handshake(ctx.channel(), request);
+            // 记录管道处理上下文，便于服务器推送数据到客户端
+            this.ctx = ctx;
+        }
+    }
+
+    /**
+     * Http返回
+     * @param ctx
+     * @param request
+     * @param response
+     */
+    private static void sendHttpResponse(ChannelHandlerContext ctx, FullHttpRequest request, FullHttpResponse response) {
+        // 返回应答给客户端
+        if (response.getStatus().code() != 200) {
+            ByteBuf buf = Unpooled.copiedBuffer(response.getStatus().toString(), CharsetUtil.UTF_8);
+            response.content().writeBytes(buf);
+            buf.release();
+            HttpHeaders.setContentLength(response, response.content().readableBytes());
+        }
+
+        // 如果是非Keep-Alive，关闭连接
+        ChannelFuture f = ctx.channel().writeAndFlush(response);
+        if (!HttpHeaders.isKeepAlive(request) || response.getStatus().code() != 200) {
+            f.addListener(ChannelFutureListener.CLOSE);
+        }
     }
 
     @Override
@@ -86,7 +163,7 @@ public class TextWebSocketHandler extends SimpleChannelInboundHandler<TextWebSoc
         String txtMsg = "[" + ip + "][" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "] ==> " + map.toString();
         //TODO 这是发给自己
         ctx.channel().writeAndFlush(new TextWebSocketFrame(txtMsg));
-        //tx.fireChannelRead(msg);
+
 
     }
 
