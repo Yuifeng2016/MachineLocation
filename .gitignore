@@ -1,7 +1,7 @@
 HELP.md
 /target/
 !.mvn/wrapper/maven-wrapper.jar
-
+rebel.xml
 .rebel.xml.bak
 ### STS ###
 .apt_generated

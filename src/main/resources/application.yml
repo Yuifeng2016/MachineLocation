@@ -26,3 +26,8 @@ spring:
 
 
 
+logging:
+  config: classpath:log4j2.xml
+  level.io.lettuce: info
+  level.io.netty.handler.codec.http.websocketx: info
+  level.org.springframework.data.redis.core: info

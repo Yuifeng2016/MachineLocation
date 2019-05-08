@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    Welcome to use the TableGo Tools.
+    
+    http://vipbooks.iteye.com
+    http://blog.csdn.net/vipbooks
+    http://www.cnblogs.com/vipbooks
+    
+    Author:bianj
+    Email:edinsker@163.com
+    Version:5.0.0
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- PROGRAM -->
+<mapper namespace="oplibrary.cloud.pile.dao.ProgramDao">
+    <!-- 开启二级缓存 -->
+    <cache/>
+    <!-- 结果映射 -->
+    <resultMap id="programMap" type="ProgramEntity">
+        <id column="ID" property="id" jdbcType="VARCHAR" />
+        <result column="CREATOR_NAME" property="creatorName" jdbcType="VARCHAR" />
+        <result column="CREATOR_ID" property="creatorId" jdbcType="VARCHAR" />
+        <result column="CREATE_DATE" property="createDate" jdbcType="TIMESTAMP" />
+        <result column="UPDATE_DATE" property="updateDate" jdbcType="TIMESTAMP" />
+        <result column="PROGRAM_NAME" property="programName" jdbcType="VARCHAR" />
+        <result column="LATITUDE" property="latitude" jdbcType="DOUBLE" />
+        <result column="LONGITUDE" property="longitude" jdbcType="DOUBLE" />
+        <result column="ALTITUDE" property="altitude" jdbcType="DOUBLE" />
+        <result column="LOCATION" property="location" jdbcType="VARCHAR" />
+    </resultMap>
+    
+    <!-- 表所有字段 -->
+    <sql id="allColumns">
+        ID, CREATOR_NAME, CREATOR_ID, CREATE_DATE, UPDATE_DATE, 
+        PROGRAM_NAME, LATITUDE, LONGITUDE, ALTITUDE, LOCATION
+    </sql>
+    
+    <!-- 查询所有数据 -->
+    <select id="findProgramAll" resultMap="programMap">
+        SELECT
+        <include refid="allColumns" />
+        FROM PROGRAM
+    </select>
+    
+    <!-- 根据条件查询数据 -->
+    <select id="findProgramByCondition" resultMap="programMap" parameterType="map">
+        SELECT
+        <include refid="allColumns" />
+        FROM PROGRAM WHERE 1 = 1
+        <if test="creatorName != null and creatorName != ''">
+            AND CREATOR_NAME LIKE '%${creatorName}%'
+        </if>
+        <if test="creatorId != null and creatorId != ''">
+            AND CREATOR_ID LIKE '%${creatorId}%'
+        </if>
+
+    </select>
+
+    <!-- 根据主键查询指定数据 -->
+    <select id="getById" resultMap="programMap" parameterType="String">
+        SELECT
+        <include refid="allColumns" />
+        FROM PROGRAM WHERE ID = #{id}
+    </select>
+
+    <!-- 根据主键查询多个数据 -->
+    <select id="findProgramByIds" resultMap="programMap" parameterType="list">
+        SELECT
+        <include refid="allColumns" />
+        FROM PROGRAM WHERE ID IN
+        <foreach collection="list" index="index" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 根据项目名称查询指定数据 -->
+    <select id="getByName" resultMap="programMap" parameterType="String">
+        SELECT
+        <include refid="allColumns" />
+        FROM PROGRAM WHERE program_name = #{name}
+    </select>
+
+    <!--分页查询总数-->
+    <select id="listPageCount" parameterType="HashMap" resultType="Long">
+        select count(1) from PROGRAM
+        <where>
+            <if test="userId != null and userId != ''">
+                id IN (SELECT program_id FROM program_user_relation WHERE user_id = #{userId})
+            </if>
+        </where>
+    </select>
+    <!--分页查询数据-->
+    <select id="listPage" parameterType="HashMap" resultMap="programMap">
+        select <include refid="allColumns"/> from PROGRAM
+        <where>
+            <if test="userId != null and userId != ''">
+                id IN (SELECT program_id FROM program_user_relation WHERE user_id = #{userId})
+            </if>
+        </where>
+        order by CREATE_DATE desc
+        limit #{pageSize} offset #{pageFirst}
+    </select>
+
+    <!-- 插入数据 -->
+    <insert id="insert" parameterType="map">
+        INSERT INTO PROGRAM (<include refid="allColumns" />)
+        VALUES (
+            #{id},
+            #{creatorName},
+            #{creatorId},
+            #{createDate},
+            #{updateDate},
+            #{programName},
+            #{latitude},
+            #{longitude},
+            #{altitude},
+            st_geomfromtext('POINT(${longitude} ${latitude})',4326)
+        )
+    </insert>
+    
+    <!-- 批量插入数据 -->
+    <insert id="inserts" parameterType="list">
+        INSERT INTO PROGRAM (<include refid="allColumns" />)
+        VALUES
+        <foreach collection="list" index="index" item="item" separator=",">
+            (
+                #{item.id},
+                #{item.creatorName},
+                #{item.creatorId},
+                #{item.createDate},
+                #{item.updateDate},
+                #{item.programName},
+                #{item.latitude},
+                #{item.longitude},
+                #{item.altitude},
+                #{item.location}
+            )
+        </foreach>
+    </insert>
+    
+    <!-- 修改数据 -->
+    <update id="update" parameterType="ProgramEntity">
+        UPDATE PROGRAM SET
+        <trim suffixOverrides=",">
+            <if test="creatorName != null">
+                CREATOR_NAME = #{creatorName},
+            </if>
+            <if test="creatorId != null">
+                CREATOR_ID = #{creatorId},
+            </if>
+            <if test="createDate != null">
+                CREATE_DATE = #{createDate},
+            </if>
+            <if test="updateDate != null">
+                UPDATE_DATE = #{updateDate},
+            </if>
+            <if test="programName != null">
+                PROGRAM_NAME = #{programName},
+            </if>
+            <if test="latitude != null">
+                LATITUDE = #{latitude},
+            </if>
+            <if test="longitude != null">
+                LONGITUDE = #{longitude},
+            </if>
+            <if test="altitude != null">
+                ALTITUDE = #{altitude},
+            </if>
+            <if test="longitude != null and latitude!=null" >
+                LOCATION = st_geomfromtext('POINT(${longitude} ${latitude})',4326)
+            </if>
+        </trim>
+        WHERE ID = #{id}
+    </update>
+    
+    <!-- 批量修改数据 -->
+    <update id="updatePrograms" parameterType="list">
+        <foreach collection="list" index="index" item="item" open="DO $$DECLARE BEGIN" close="END$$;">
+            UPDATE PROGRAM SET
+                CREATOR_NAME = '${item.creatorName}',
+                CREATOR_ID = '${item.creatorId}',
+                PROGRAM_NAME = '${item.programName}',
+                LOCATION = st_geomfromtext('POINT(${longitude} ${latitude})',4326)
+            WHERE ID = '${item.id}';
+        </foreach>
+    </update>
+    
+    <!-- 根据主键删除数据 -->
+    <delete id="deleteById" parameterType="string">
+        DELETE FROM PROGRAM WHERE ID = #{id}
+    </delete>
+    
+    <!-- 根据主键批量删除数据 -->
+    <delete id="deleteProgramByIds" parameterType="list">
+        DELETE FROM PROGRAM WHERE ID IN
+        <foreach collection="list" index="index" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

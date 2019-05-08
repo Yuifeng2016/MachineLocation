@@ -115,15 +115,18 @@ public class WSServerInitializer extends ChannelInitializer<SocketChannel> {
                     String dateTime = LocalDateTime.now(ZoneOffset.of("+8")).format(formatter);
                     onlineContainer.getUserMap().forEach((userId,ctxId)->{
                         //根据userId获取projectId
+                        String locations = "{}";
                         Map<String, String> userParams = onlineContainer.getUserParamsMap().get(userId);
-
+                        try {
+                            locations = locationRedisService.getMachineRealTimeLocationsJson(userParams);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
                         //根据projectId获取位置记录
-                        String locations = locationRedisService.getMachineRealTimeLocationsJson(userParams);
                         String msgToClient = String.format("[%s]: %s",dateTime,locations);
                         logger.info("username:{},locations:{}",userId,locations);
                         //此处projectId视为接入服务的用户的id
                         ChannelHandlerContext context = onlineContainer.getChannelHandlerContextByUserId(userId);
-
                         context.channel().writeAndFlush(new TextWebSocketFrame(msgToClient));
                     });
                 }

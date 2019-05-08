@@ -117,7 +117,10 @@ public class LocationRedisService {
      */
     public  List<MachineRealTimeLocation> getMachineRealTimeLocationListByProgramId(String username,String programId)  {
         List<MachineRealTimeLocation> list = getMachineRealTimeLocationList();
-        list = list.stream().filter(location-> location.getProgramId().equalsIgnoreCase(programId)).collect(Collectors.toList()); //查询指定项目
+        list = list.stream().filter(location-> {
+            String tempId = location.getProgramId();
+            return tempId != null && tempId.equalsIgnoreCase(programId);
+        }).collect(Collectors.toList()); //查询指定项目
         list = list.stream().filter(location -> location.getMember().contains(username)).collect(Collectors.toList()); //判断用户是否在该项目
 
 
@@ -155,10 +158,9 @@ public class LocationRedisService {
             BeanUtils.copyProperties(location,dto);
             return dto;
         }).collect(Collectors.toList());
-//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-//        returnMap.put("serverTime",localDateTime.format(formatter));
+
         returnMap.put("activeMachine",locationDto);
-        //logger.info(returnMap.toString());
+
         return returnMap;
     }
 
